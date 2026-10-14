@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folha X - Abertas x Fechadas por Período</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --ink:#1f2430; --muted:#6b7280; --faint:#9ca3af; --line:#e5e7eb; --bg:#f4f5f7; --card:#fff;
+  --brand:#1a237e; --brand-soft:#eef0fb;
+  --done:#2e7d32; --test:#7b1fa2; --doing:#1565c0; --todo:#c7cbd3; --bug:#c62828; --warn:#e65100;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI', Tahoma, Verdana, sans-serif; background:var(--bg); color:var(--ink); padding:20px; font-size:14px; }
+.wrap { max-width:1300px; margin:0 auto; }
+a { color:var(--brand); text-decoration:none; }
+a:hover { text-decoration:underline; }
+
+header.page { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+header.page h1 { font-size:1.35rem; color:var(--brand); }
+header.page p { color:var(--muted); font-size:0.8rem; }
+
+.toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; background:var(--card); padding:10px 12px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+.toolbar input[type=text], .toolbar input[type=number], .toolbar input[type=date] { padding:7px 10px; border:1px solid var(--line); border-radius:6px; font-size:0.85rem; font-family:inherit; }
+.toolbar input[type=text] { flex:1; min-width:200px; }
+.toolbar input[type=number] { width:90px; }
+.toolbar select { padding:7px 8px; border:1px solid var(--line); border-radius:6px; font-size:0.85rem; background:#fff; max-width:220px; }
+.toolbar .field { display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--muted); }
+.toolbar .check { display:flex; align-items:center; gap:5px; font-size:0.8rem; color:var(--muted); cursor:pointer; white-space:nowrap; }
+.toolbar .spacer { flex:0 0 1px; height:22px; background:var(--line); margin:0 2px; }
+.toolbar .grow { flex:1; }
+.btn { padding:7px 12px; border:1px solid var(--line); border-radius:6px; font-size:0.8rem; font-weight:600; cursor:pointer; background:#fff; color:var(--ink); font-family:inherit; }
+.btn:hover { border-color:var(--brand); color:var(--brand); }
+.btn:disabled { background:#eee; color:#999; cursor:wait; }
+.btn-primary { background:var(--brand); border-color:var(--brand); color:#fff; }
+.btn-primary:hover { background:#131a5e; color:#fff; }
+
+.pat-settings { position:relative; }
+.pat-settings summary { cursor:pointer; list-style:none; padding:6px 9px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--muted); user-select:none; }
+.pat-settings summary::-webkit-details-marker { display:none; }
+.pat-settings summary:hover, .pat-settings[open] summary { color:var(--brand); border-color:var(--brand); }
+.pat-settings-body { position:absolute; top:calc(100% + 6px); right:0; z-index:20; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:14px 16px; display:flex; flex-direction:column; gap:10px; width:340px; }
+.pat-settings-body label { font-size:0.76rem; color:#555; display:flex; flex-direction:column; gap:4px; }
+.pat-settings-body input[type=password] { padding:7px 9px; border:1px solid #ccc; border-radius:6px; font-size:0.82rem; width:100%; }
+.pat-settings-body small { color:var(--muted); font-size:0.7rem; }
+
+.refresh-status { display:block; min-height:1.2em; margin:6px 2px 12px; font-size:0.75rem; color:var(--muted); }
+.refresh-status.ok { color:var(--done); }
+.refresh-status.err { color:#c62828; font-weight:600; }
+
+.kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px; margin-bottom:14px; }
+.kpi { background:var(--card); border-radius:10px; padding:12px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); display:flex; flex-direction:column; justify-content:center; color:inherit; }
+a.kpi:hover { text-decoration:none; box-shadow:0 0 0 1px var(--brand); }
+.kpi .n { font-size:1.6rem; font-weight:800; color:var(--brand); line-height:1.1; }
+.kpi .l { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+.kpi.good .n { color:var(--done); }
+.kpi.warn .n { color:var(--warn); }
+.kpi-counts { display:flex; gap:22px; flex-wrap:wrap; }
+.kpi-counts div b { display:block; font-size:1.25rem; color:var(--ink); }
+.kpi-counts div span { font-size:0.75rem; color:var(--muted); }
+
+.card { background:var(--card); border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:14px; }
+.card h3 { font-size:0.9rem; color:var(--ink); margin-bottom:12px; font-weight:700; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.grid2 > .card { margin-bottom:0; }
+.grid2 + * { margin-top:14px; }
+.section-title { font-size:1rem; font-weight:700; margin:22px 4px 10px; display:flex; align-items:center; gap:10px; }
+.section-title .count, .muted { font-size:0.78rem; color:var(--muted); font-weight:400; }
+.note { font-size:0.75rem; color:var(--muted); margin-top:8px; line-height:1.45; }
+
+.tbl-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+th { text-align:left; font-weight:600; color:var(--muted); font-size:0.75rem; padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+td { padding:7px 10px; border-bottom:1px solid #f0f1f3; }
+tbody tr:hover { background:#f7f8fa; }
+tfoot td { font-weight:700; border-top:1px solid var(--line); border-bottom:none; }
+.num { text-align:right; font-variant-numeric:tabular-nums; }
+.cell-warn { background:#fff8e1; }
+.cell-alert { background:#ffebee; color:#b71c1c; }
+
+.empty-state { text-align:center; color:var(--faint); padding:40px; font-size:0.9rem; }
+.empty-row { font-size:0.8rem; color:var(--faint); padding:8px; list-style:none; }
+
+.legend { display:flex; gap:14px; flex-wrap:wrap; font-size:0.75rem; color:var(--muted); margin:0 2px 14px; }
+.legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+
+.bar { display:flex; height:8px; border-radius:4px; overflow:hidden; background:var(--todo); }
+.bar span { display:block; height:100%; }
+.seg-done { background:var(--done); }
+.seg-test { background:var(--test); }
+.seg-doing { background:var(--doing); }
+.seg-todo { background:var(--todo); }
+
+.state { font-size:0.78rem; color:var(--muted); white-space:nowrap; }
+.state::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; background:var(--todo); vertical-align:1px; }
+.state.s-done::before { background:var(--done); }
+.state.s-test::before { background:var(--test); }
+.state.s-doing::before { background:var(--doing); }
+.state.s-removed::before { background:transparent; border:1px solid var(--faint); }
+
+.type { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:16px; padding:0 3px; border-radius:3px; font-size:0.62rem; font-weight:700; color:#fff; flex:0 0 auto; }
+.type-epic { background:#5e35b1; }
+.type-feature { background:#00897b; }
+.type-story { background:#1e88e5; }
+.type-bug { background:var(--bug); }
+.type-task { background:#9e9e9e; }
+
+.collapsible { background:var(--card); border-radius:8px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+.collapsible > .head { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; }
+.collapsible > .head:hover { background:#fafbfd; }
+.collapsible > .body { display:none; border-top:1px solid var(--line); padding:8px 16px 12px; }
+.collapsible.open > .body { display:block; }
+.chev { color:var(--faint); font-size:0.75rem; transition:transform 0.15s; display:inline-block; }
+.collapsible.open > .head .chev { transform:rotate(90deg); }
+
+.footer { text-align:center; color:var(--faint); font-size:0.72rem; margin-top:24px; }
+
+@media (max-width:900px) {
+  .grid2 { grid-template-columns:1fr; }
+}
+
+.types-box { display:flex; flex-wrap:wrap; gap:4px; }
+.type-chip { padding:4px 9px; border:1px solid var(--line); border-radius:12px; font-size:0.75rem; color:var(--muted); background:#fff; cursor:pointer; user-select:none; white-space:nowrap; }
+.type-chip input { display:none; }
+.type-chip:hover { border-color:var(--brand); }
+.type-chip.checked { background:var(--brand-soft); border-color:var(--brand); color:var(--brand); font-weight:600; }
+.period-hint { font-size:0.75rem; color:var(--warn); white-space:nowrap; }
+.period-hint[hidden] { display:none; }
+
+.kpi.opened .n { color:var(--doing); }
+.kpi.closed .n { color:var(--done); }
+
+.grid2.periodo { grid-template-columns:1.4fr 1fr; }
+.card h3 .muted { margin-left:6px; }
+.card .legend { margin:-4px 0 8px; }
+.chart-wrap { position:relative; height:280px; }
+.tbl-wrap.scroll { max-height:420px; overflow-y:auto; }
+.tbl-wrap.scroll th { position:sticky; top:0; background:var(--card); }
+td .type { margin-right:6px; }
+td.date { white-space:nowrap; font-variant-numeric:tabular-nums; }
+td.title { min-width:260px; }
+@media (max-width:900px) { .grid2.periodo { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <h1>Abertas x Fechadas</h1>
+    <p title="Área: HCM - Senior\Folha X. Tipos: Bug, User Story, Task, Feature, Epic. Datas convertidas para o fuso local. Alterar o período requer Atualizar dados; alterar o tipo apenas re-filtra o que já foi carregado.">Itens criados e fechados no período · dados ao vivo do Azure DevOps</p>
+  </header>
+
+  <div class="toolbar">
+    <label class="field" title="Alterar o período exige clicar em Atualizar dados">De <input type="date" id="startDate"></label>
+    <label class="field" title="Alterar o período exige clicar em Atualizar dados">até <input type="date" id="endDate"></label>
+    <span class="period-hint" id="periodHint" hidden>Período alterado: clique em Atualizar dados</span>
+    <span class="spacer"></span>
+    <div class="types-box" id="typesBox" title="Filtra os dados já carregados, sem nova busca"></div>
+
+    <span class="grow"></span>
+    <details class="pat-settings">
+      <summary title="Configurar PAT do Azure DevOps">⚙</summary>
+      <div class="pat-settings-body">
+        <label>Azure DevOps PAT
+          <input type="password" id="patInput" placeholder="cole seu PAT com escopo Work Items (Read)">
+        </label>
+        <button class="btn" id="btnSavePat">Salvar no navegador</button>
+        <small>O token fica salvo apenas no localStorage deste navegador (mesmo PAT usado nos demais dashboards do portal).</small>
+      </div>
+    </details>
+    <button class="btn btn-primary" id="btnRefresh">Atualizar dados</button>
+  </div>
+  <span class="refresh-status" id="refreshStatus"></span>
+
+  <div class="kpis">
+    <a class="kpi opened" id="kpiAbertas" href="#" target="_blank" title="Abrir consulta no Azure DevOps">
+      <div class="n" id="nAbertas">-</div>
+      <div class="l">abertas no período ↗</div>
+    </a>
+    <a class="kpi closed" id="kpiFechadas" href="#" target="_blank" title="Abrir consulta no Azure DevOps">
+      <div class="n" id="nFechadas">-</div>
+      <div class="l">fechadas no período ↗</div>
+    </a>
+    <div class="kpi" id="kpiSaldo">
+      <div class="n" id="nSaldo">-</div>
+      <div class="l">saldo (abertas − fechadas)</div>
+    </div>
+  </div>
+
+  <div class="grid2 periodo">
+    <div class="card">
+      <h3>Abertas x fechadas por semana</h3>
+      <div class="legend">
+        <span><i class="seg-doing"></i>Abertas (criadas)</span>
+        <span><i class="seg-done"></i>Fechadas</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chartPeriodo"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Por tipo de work item</h3>
+      <div class="tbl-wrap scroll">
+        <table>
+          <thead><tr><th>Tipo</th><th class="num">Abertas</th><th class="num">Fechadas</th><th class="num">Saldo</th></tr></thead>
+          <tbody id="breakdownBody"><tr><td colspan="4" class="empty-state">Clique em "Atualizar dados" para carregar.</td></tr></tbody>
+          <tfoot id="breakdownFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Itens do período <span class="muted" id="itemsCount"></span></h3>
+    <div class="tbl-wrap scroll">
+      <table>
+        <thead><tr><th>ID</th><th>Título</th><th>Estado</th><th>Responsável</th><th>Criado</th><th>Fechado</th></tr></thead>
+        <tbody id="itemsBody"><tr><td colspan="6" class="empty-state">Configure o PAT (⚙) e clique em "Atualizar dados" para carregar.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+<script>
+// ============================================================
+// Cliente Azure DevOps (gerado por ado_common.py)
+// ============================================================
+const ADO_ORG = "senior-sistemas";
+const ADO_PROJECT = "HCM - Senior";
+const ADO_TEAM = "Folha X";
+const AREA_PATH = "HCM - Senior\\Folha X";
+const PAT_KEY = "ado_dashboard_pat";
+const WIQL_MAX = 20000;  // limite máximo de resultados da API WIQL
+
+// Avisos de carga incompleta (resultado truncado, lote com erro etc.),
+// exibidos ao final da atualização em vez de serem engolidos.
+let loadWarnings = [];
+
+function getPat() { return localStorage.getItem(PAT_KEY) || ""; }
+function adoHeaders() { return { "Authorization": "Basic " + btoa(":" + getPat()), "Content-Type": "application/json" }; }
+function adoBase() { return `https://dev.azure.com/${ADO_ORG}/${encodeURIComponent(ADO_PROJECT)}`; }
+
+async function adoError(resp, what) {
+  let detail = "";
+  try { detail = (await resp.json()).message || ""; } catch (e) { /* corpo não era JSON */ }
+  return new Error(`${what} falhou (HTTP ${resp.status})${detail ? ": " + detail : (resp.status === 401 || resp.status === 403 ? ". Verifique o PAT." : ".")}`);
+}
+
+// Retorna o JSON completo da consulta WIQL (útil para WorkItemLinks).
+async function wiqlRaw(query, label) {
+  const url = `${adoBase()}/${encodeURIComponent(ADO_TEAM)}/_apis/wit/wiql?api-version=7.1&$top=${WIQL_MAX}`;
+  const resp = await fetch(url, { method: "POST", headers: adoHeaders(), body: JSON.stringify({ query }) });
+  if (!resp.ok) throw await adoError(resp, "Consulta WIQL" + (label ? ` (${label})` : ""));
+  const data = await resp.json();
+  const n = (data.workItems || data.workItemRelations || []).length;
+  if (n >= WIQL_MAX) {
+    loadWarnings.push(`${label || "consulta"}: resultado atingiu o limite de ${WIQL_MAX} itens e pode estar incompleto`);
+  }
+  return data;
+}
+
+// Retorna só os IDs da consulta WIQL.
+async function wiql(query, label) {
+  const data = await wiqlRaw(query, label);
+  return (data.workItems || []).map(wi => wi.id);
+}
+
+async function getWorkItemsBatch(ids, fields) {
+  const all = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const batch = ids.slice(i, i + 200);
+    const resp = await fetch(`${adoBase()}/_apis/wit/workitemsbatch?api-version=7.1`, { method: "POST", headers: adoHeaders(), body: JSON.stringify({ ids: batch, fields }) });
+    if (!resp.ok) throw await adoError(resp, "Busca de work items");
+    const data = await resp.json();
+    all.push(...(data.value || []));
+  }
+  return all;
+}
+
+// IDs dos filhos (de certos tipos) de vários pais, em lotes de 500.
+// Um lote com erro vira aviso e não interrompe a carga.
+async function queryChildrenOfMany(parentIds, types, extraClause) {
+  if (!parentIds.length) return [];
+  const typesClause = types.map(t => `'${wiqlStr(t)}'`).join(", ");
+  let allIds = [];
+  for (let i = 0; i < parentIds.length; i += 500) {
+    const batch = parentIds.slice(i, i + 500);
+    const query = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${wiqlStr(ADO_PROJECT)}' AND [System.WorkItemType] IN (${typesClause}) AND [System.Parent] IN (${batch.map(Number).join(", ")}) ${extraClause || ""}`;
+    const label = `filhos ${types.join("/")} (lote ${i / 500 + 1})`;
+    try {
+      allIds = allIds.concat(await wiql(query, label));
+    } catch (e) {
+      loadWarnings.push(`${label}: ${e.message}`);
+    }
+  }
+  return allIds;
+}
+
+// Executa fn(item) para cada item com no máximo `limit` chamadas simultâneas.
+async function runWithConcurrency(items, limit, fn) {
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const item = items[next++];
+      await fn(item);
+    }
+  }
+  const workers = [];
+  for (let w = 0; w < Math.min(limit, items.length); w++) workers.push(worker());
+  await Promise.all(workers);
+}
+
+function extractName(field) {
+  if (!field) return "Não atribuído";
+  if (typeof field === "object") return field.displayName || "Não atribuído";
+  return String(field);
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// Escapa um texto para uso dentro de uma string WIQL ('...').
+function wiqlStr(s) { return String(s ?? "").replace(/'/g, "''"); }
+
+function stripHtml(text) {
+  let t = (text || "").replace(/<[^>]+>/g, " ");
+  t = t.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  return t.replace(/\s+/g, " ").trim();
+}
+
+function workItemUrl(id) { return `${adoBase()}/_workitems/edit/${id}`; }
+function queryUrl(wiqlText) { return `${adoBase()}/_workitems?_a=query&wiql=${encodeURIComponent(wiqlText)}`; }
+
+const CLOSED_LIKE = new Set(["Closed", "Done", "Resolved"]);
+const TEST_LIKE = new Set(["Test", "Review"]);
+const DOING_LIKE = new Set(["Active"]);
+const IGNORED_STATES = new Set(["Removed"]);
+
+function stateGroup(state) {
+  if (CLOSED_LIKE.has(state)) return "done";
+  if (TEST_LIKE.has(state)) return "test";
+  if (DOING_LIKE.has(state)) return "doing";
+  if (IGNORED_STATES.has(state)) return "removed";
+  return "todo";
+}
+function stateLabel(state) { return `<span class="state s-${stateGroup(state)}">${escapeHtml(state)}</span>`; }
+
+const TYPE_MARKS = {
+  "Epic": ["E", "type-epic"], "Feature": ["F", "type-feature"], "User Story": ["US", "type-story"],
+  "Bug": ["B", "type-bug"], "Task": ["T", "type-task"],
+};
+function typeMark(type) {
+  const [label, cls] = TYPE_MARKS[type] || [(type || "?").slice(0, 2), "type-task"];
+  return `<span class="type ${cls}" title="${escapeHtml(type)}">${label}</span>`;
+}
+
+function round1(x) { return Math.round((x || 0) * 10) / 10; }
+function median(sortedValues) {
+  const v = sortedValues, n = v.length;
+  if (!n) return 0;
+  return n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2;
+}
+
+// Data local (não UTC) no formato YYYY-MM-DD.
+function localIsoDate(d) {
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById("refreshStatus");
+  el.textContent = msg;
+  el.className = "refresh-status " + (cls || "");
+}
+
+// Mensagem final da atualização: sinaliza em vermelho se houve avisos.
+function finishStatus(doneMsg) {
+  if (loadWarnings.length) {
+    console.warn("Avisos de carga:", loadWarnings);
+    setStatus(`${doneMsg} ⚠️ Dados possivelmente incompletos (${loadWarnings.length} aviso(s)): ${loadWarnings.slice(0, 3).join("; ")}${loadWarnings.length > 3 ? "; ..." : ""}`, "err");
+  } else {
+    setStatus(doneMsg, "ok");
+  }
+}
+
+// Liga o campo de PAT (⚙) e o botão Atualizar; carrega automaticamente se já houver PAT.
+function initDashboard(refreshFn) {
+  const patInput = document.getElementById("patInput");
+  patInput.value = getPat();
+  document.getElementById("btnSavePat").addEventListener("click", () => {
+    localStorage.setItem(PAT_KEY, patInput.value.trim());
+    document.querySelector(".pat-settings").removeAttribute("open");
+    setStatus("PAT salvo neste navegador.", "ok");
+  });
+  document.getElementById("btnRefresh").addEventListener("click", async () => {
+    if (!getPat()) {
+      setStatus("Configure o PAT (⚙) antes de atualizar.", "err");
+      document.querySelector(".pat-settings").setAttribute("open", "");
+      return;
+    }
+    const btn = document.getElementById("btnRefresh");
+    btn.disabled = true;
+    loadWarnings = [];
+    try {
+      await refreshFn();
+    } catch (err) {
+      console.error(err);
+      setStatus("Erro ao atualizar: " + err.message, "err");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  if (getPat()) document.getElementById("btnRefresh").click();
+  else setStatus("Configure o PAT (⚙) e clique em Atualizar dados.", "");
+}
+</script>
+<script>
+// ============================================================
+// Dashboard Período (Abertas x Fechadas)
+// ============================================================
+const ALL_TYPES = ["Bug", "User Story", "Task", "Feature", "Epic"];
+const DEFAULT_DAYS_BACK = 30;
+const COLOR_OPEN = "#1565c0";   // --doing
+const COLOR_CLOSED = "#2e7d32"; // --done
+
+let ITEMS = [];
+let loaded = false;          // já houve uma carga com sucesso?
+let loadedPeriod = null;     // período da última carga ({start, end})
+let chartInstance = null;
+
+const startInput = document.getElementById("startDate");
+const endInput = document.getElementById("endDate");
+
+// Datas padrão calculadas ao abrir a página (não ficam velhas no HTML).
+(function setDefaultDates() {
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(start.getDate() - DEFAULT_DAYS_BACK);
+  endInput.value = localIsoDate(today);
+  startInput.value = localIsoDate(start);
+})();
+
+// Alterar o período não busca dados sozinho: avisa que é preciso atualizar.
+function updatePeriodHint() {
+  const changed = loadedPeriod && (startInput.value !== loadedPeriod.start || endInput.value !== loadedPeriod.end);
+  document.getElementById("periodHint").hidden = !changed;
+}
+startInput.addEventListener("change", updatePeriodHint);
+endInput.addEventListener("change", updatePeriodHint);
+
+// ISO (UTC) -> data local YYYY-MM-DD, para não jogar itens criados à noite no dia seguinte.
+function toLocalDay(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return isNaN(d) ? null : localIsoDate(d);
+}
+
+// YYYY-MM-DD -> DD/MM/AAAA
+function fmtDay(day) {
+  if (!day) return "";
+  const [y, m, d] = day.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+// ============================================================
+// Chips de tipo (re-filtram sem nova busca)
+// ============================================================
+const typesBox = document.getElementById("typesBox");
+function renderTypeChips() {
+  let html = `<label class="type-chip checked" data-all="1"><input type="checkbox" value="__ALL__" checked>Todos</label>`;
+  ALL_TYPES.forEach(t => {
+    html += `<label class="type-chip checked" data-type="${escapeHtml(t)}"><input type="checkbox" value="${escapeHtml(t)}" checked>${escapeHtml(t)}</label>`;
+  });
+  typesBox.innerHTML = html;
+
+  typesBox.querySelectorAll(".type-chip").forEach(chip => {
+    chip.addEventListener("click", (e) => {
+      if (e.target.tagName !== "INPUT") {
+        e.preventDefault();
+        const input = chip.querySelector("input");
+        input.checked = !input.checked;
+      }
+      if (chip.dataset.all) {
+        const checked = chip.querySelector("input").checked;
+        typesBox.querySelectorAll(".type-chip:not([data-all])").forEach(c => {
+          c.querySelector("input").checked = checked;
+          c.classList.toggle("checked", checked);
+        });
+      } else {
+        const allChip = typesBox.querySelector("[data-all]");
+        const allChecked = [...typesBox.querySelectorAll(".type-chip:not([data-all]) input")].every(i => i.checked);
+        allChip.querySelector("input").checked = allChecked;
+        allChip.classList.toggle("checked", allChecked);
+      }
+      chip.classList.toggle("checked", chip.querySelector("input").checked);
+      renderAll();
+    });
+  });
+}
+renderTypeChips();
+
+function getSelectedTypes() {
+  return [...typesBox.querySelectorAll(".type-chip:not([data-all]) input:checked")].map(i => i.value);
+}
+
+// ============================================================
+// WIQL / links para o Azure DevOps
+// ============================================================
+function buildWiql(dateField, start, end, types) {
+  const typesClause = types.map(t => `'${wiqlStr(t)}'`).join(", ");
+  return `SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State], [System.AssignedTo] FROM WorkItems WHERE [System.TeamProject] = '${wiqlStr(ADO_PROJECT)}' AND [System.WorkItemType] IN (${typesClause}) AND [System.AreaPath] UNDER '${wiqlStr(AREA_PATH)}' AND [${dateField}] >= '${start}' AND [${dateField}] <= '${end}' ORDER BY [${dateField}] DESC`;
+}
+
+// ============================================================
+// Gráfico semanal
+// ============================================================
+function generateBuckets(startStr, endStr) {
+  const buckets = [];
+  let current = new Date(startStr + "T00:00:00");
+  const endDate = new Date(endStr + "T00:00:00");
+  const ddmm = d => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  while (current <= endDate) {
+    const bucketEnd = new Date(current);
+    bucketEnd.setDate(bucketEnd.getDate() + 6);
+    const actualEnd = bucketEnd > endDate ? endDate : bucketEnd;
+    buckets.push({ start: localIsoDate(current), end: localIsoDate(actualEnd), label: `${ddmm(current)}-${ddmm(actualEnd)}` });
+    current = new Date(actualEnd);
+    current.setDate(current.getDate() + 1);
+  }
+  return buckets;
+}
+
+function renderChart(filteredOpen, filteredClosed, start, end) {
+  const buckets = generateBuckets(start, end);
+  const openData = buckets.map(b => filteredOpen.filter(it => it.created >= b.start && it.created <= b.end).length);
+  const closedData = buckets.map(b => filteredClosed.filter(it => it.closed >= b.start && it.closed <= b.end).length);
+
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.color = "#6b7280";
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(document.getElementById("chartPeriodo"), {
+    type: "bar",
+    data: {
+      labels: buckets.map(b => b.label),
+      datasets: [
+        { label: "Abertas", data: openData, backgroundColor: COLOR_OPEN, borderRadius: 3, maxBarThickness: 28 },
+        { label: "Fechadas", data: closedData, backgroundColor: COLOR_CLOSED, borderRadius: 3, maxBarThickness: 28 },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#f0f1f3" }, border: { display: false } },
+        x: { grid: { display: false }, ticks: { maxRotation: 45 } },
+      },
+    },
+  });
+}
+
+// ============================================================
+// Tabela por tipo
+// ============================================================
+function renderBreakdown(filteredOpen, filteredClosed, selectedTypes, start, end) {
+  const rows = selectedTypes.map(t => ({
+    type: t,
+    abertas: filteredOpen.filter(it => it.type === t).length,
+    fechadas: filteredClosed.filter(it => it.type === t).length,
+    urlOpen: queryUrl(buildWiql("System.CreatedDate", start, end, [t])),
+    urlClosed: queryUrl(buildWiql("Microsoft.VSTS.Common.ClosedDate", start, end, [t])),
+  })).filter(r => r.abertas > 0 || r.fechadas > 0);
+
+  const tbody = document.getElementById("breakdownBody");
+  const tfoot = document.getElementById("breakdownFoot");
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Nenhum item no período/tipo selecionado.</td></tr>`;
+    tfoot.innerHTML = "";
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `<tr>
+    <td>${typeMark(r.type)}${escapeHtml(r.type)}</td>
+    <td class="num"><a href="${r.urlOpen}" target="_blank" title="Abrir consulta no Azure DevOps">${r.abertas}</a></td>
+    <td class="num"><a href="${r.urlClosed}" target="_blank" title="Abrir consulta no Azure DevOps">${r.fechadas}</a></td>
+    <td class="num">${r.abertas - r.fechadas}</td>
+  </tr>`).join("");
+  const tOpen = rows.reduce((s, r) => s + r.abertas, 0);
+  const tClosed = rows.reduce((s, r) => s + r.fechadas, 0);
+  tfoot.innerHTML = `<tr><td>Total</td><td class="num">${tOpen}</td><td class="num">${tClosed}</td><td class="num">${tOpen - tClosed}</td></tr>`;
+}
+
+// ============================================================
+// Lista de itens
+// ============================================================
+function renderItemsTable(filteredOpen, filteredClosed) {
+  const byId = new Map();
+  filteredOpen.forEach(it => byId.set(it.id, it));
+  filteredClosed.forEach(it => byId.set(it.id, it));
+  const combined = [...byId.values()].sort((a, b) => (b.closed || b.created || "").localeCompare(a.closed || a.created || ""));
+
+  document.getElementById("itemsCount").textContent = combined.length ? `${combined.length} itens` : "";
+  const tbody = document.getElementById("itemsBody");
+  if (!combined.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Nenhum item no período/tipo selecionado.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = combined.map(it => `<tr>
+    <td><a href="${workItemUrl(it.id)}" target="_blank">${it.id}</a></td>
+    <td class="title">${typeMark(it.type)}${escapeHtml(it.title)}</td>
+    <td>${stateLabel(it.state)}</td>
+    <td>${escapeHtml(it.assignee)}</td>
+    <td class="date">${fmtDay(it.created) || "-"}</td>
+    <td class="date">${it.closed ? fmtDay(it.closed) : '<span class="muted">em aberto</span>'}</td>
+  </tr>`).join("");
+}
+
+// ============================================================
+// Renderização (a partir dos dados já carregados em ITEMS)
+// ============================================================
+function renderAll() {
+  if (!loaded) return;
+  // Usa o período efetivamente carregado (mudar as datas exige Atualizar).
+  const { start, end } = loadedPeriod;
+  const selectedTypes = getSelectedTypes();
+
+  const filteredOpen = ITEMS.filter(it => selectedTypes.includes(it.type) && it.created && it.created >= start && it.created <= end);
+  const filteredClosed = ITEMS.filter(it => selectedTypes.includes(it.type) && it.closed && it.closed >= start && it.closed <= end);
+
+  const saldo = filteredOpen.length - filteredClosed.length;
+  document.getElementById("nAbertas").textContent = filteredOpen.length;
+  document.getElementById("nFechadas").textContent = filteredClosed.length;
+  document.getElementById("nSaldo").textContent = saldo > 0 ? `+${saldo}` : saldo;
+  const kpiSaldo = document.getElementById("kpiSaldo");
+  kpiSaldo.classList.toggle("warn", saldo > 0);
+  kpiSaldo.classList.toggle("good", saldo <= 0);
+
+  document.getElementById("kpiAbertas").href = queryUrl(buildWiql("System.CreatedDate", start, end, selectedTypes));
+  document.getElementById("kpiFechadas").href = queryUrl(buildWiql("Microsoft.VSTS.Common.ClosedDate", start, end, selectedTypes));
+
+  renderBreakdown(filteredOpen, filteredClosed, selectedTypes, start, end);
+  renderChart(filteredOpen, filteredClosed, start, end);
+  renderItemsTable(filteredOpen, filteredClosed);
+}
+
+// ============================================================
+// Atualizar dados (busca no Azure DevOps)
+// ============================================================
+async function refreshData() {
+  const start = startInput.value;
+  const end = endInput.value;
+  if (!start || !end || start > end) {
+    throw new Error("Informe um período válido (data inicial <= data final).");
+  }
+
+  setStatus("Carregando dados do Azure DevOps...", "");
+  try {
+    const typesClause = ALL_TYPES.map(t => `'${wiqlStr(t)}'`).join(", ");
+    // A API WIQL usa precisão de data (sem horário) por padrão: passar um
+    // horário junto da data (ex: T23:59:59Z) causa erro HTTP 400
+    // ("You cannot supply a time with the date..."). Por isso usamos
+    // apenas YYYY-MM-DD aqui.
+    const query = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${wiqlStr(ADO_PROJECT)}' AND [System.WorkItemType] IN (${typesClause}) AND [System.AreaPath] UNDER '${wiqlStr(AREA_PATH)}' AND ( ([System.CreatedDate] >= '${start}' AND [System.CreatedDate] <= '${end}') OR ([Microsoft.VSTS.Common.ClosedDate] >= '${start}' AND [Microsoft.VSTS.Common.ClosedDate] <= '${end}') )`;
+    const ids = await wiql(query, "itens criados/fechados no período");
+
+    const fields = ["System.Id", "System.Title", "System.WorkItemType", "System.State", "System.AssignedTo", "System.CreatedDate", "Microsoft.VSTS.Common.ClosedDate"];
+    const raw = ids.length ? await getWorkItemsBatch(ids, fields) : [];
+
+    ITEMS = raw.map(wi => {
+      const f = wi.fields;
+      return {
+        id: f["System.Id"],
+        title: f["System.Title"] || "",
+        type: f["System.WorkItemType"] || "",
+        state: f["System.State"] || "",
+        assignee: extractName(f["System.AssignedTo"]),
+        created: toLocalDay(f["System.CreatedDate"]),
+        closed: toLocalDay(f["Microsoft.VSTS.Common.ClosedDate"]),
+      };
+    });
+
+    loaded = true;
+    loadedPeriod = { start, end };
+    updatePeriodHint();
+    renderAll();
+    finishStatus(`Atualizado: ${ITEMS.length} itens de ${fmtDay(start)} a ${fmtDay(end)} carregados às ${new Date().toLocaleTimeString("pt-BR")}.`);
+  } catch (err) {
+    const msg = `<tr><td colspan="6" class="empty-state">Falha ao carregar dados: ${escapeHtml(err.message)}</td></tr>`;
+    document.getElementById("itemsBody").innerHTML = msg;
+    throw err;
+  }
+}
+
+initDashboard(refreshData);
+</script>
+</body>
+</html>

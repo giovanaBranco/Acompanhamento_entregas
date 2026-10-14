@@ -1,0 +1,3 @@
+# Dependências dos scripts CLI (listar_*.py, atualizar_*.py).
+# Os dashboards HTML não precisam de nada instalado — rodam no navegador.
+requests==2.32.3
